@@ -108,9 +108,13 @@ Use `Journey` to create a guided walkthrough for the current page. Add steps, pi
 - `Ctrl+]`: Move selection forward
 - `Ctrl+Shift+[`: Send selection to back
 - `Ctrl+Shift+]`: Bring selection to front
+- `+` / `=`: Zoom in
+- `-`: Zoom out
+- `Space` (hold) + drag: Pan
 
 ## Project Layout
 
 - `NetDraw.html`: Main application.
 - `README.md`: Project usage notes.
 - `CHANGELOG.md`: Notable changes.
+- `LICENSE`: Project license.
