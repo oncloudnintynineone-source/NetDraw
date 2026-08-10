@@ -327,7 +327,7 @@
         <circle cx="5" cy="6" r="2.6"/><circle cx="19" cy="6" r="2.6"/><circle cx="12" cy="18" r="2.6"/>
         <path d="M7 7.5 10.5 16M17 7.5 13.5 16M7.6 6h8.8"/>
       </svg>
-      NetDraw <span class="sub">v1.1.7</span>
+      NetDraw <span class="sub">v1.1.8</span>
     </div>
 
     <div class="tgroup">
@@ -8463,7 +8463,9 @@ let view = {x:0, y:0, k:1};
 let pages = [];
 let activePageId = null;
 let tool = "select";
-let selection = new Set();        // node ids and edge ids
+let selection = new Set();        // node, edge, and zone ids
+let diagramClipboard = null;
+let pasteCount = 0;
 let undoStack = [], redoStack = [], lastSnap = "";
 let gridOn = true, snapOn = true;
 let spaceDown = false;
@@ -9533,21 +9535,82 @@ function deleteSelection(){
   commit();
   renderAll();
 }
+
+function buildSelectionClipboard(){
+  const nodes = state.nodes.filter(n => selection.has(n.id));
+  const zones = state.zones.filter(z => selection.has(z.id));
+  if(!nodes.length && !zones.length) return null;
+  const endpointIds = new Set([...nodes.map(n => n.id), ...zones.map(z => z.id)]);
+  return {
+    nodes:JSON.parse(JSON.stringify(nodes)),
+    zones:JSON.parse(JSON.stringify(zones)),
+    edges:JSON.parse(JSON.stringify(state.edges.filter(e => endpointIds.has(e.a) && endpointIds.has(e.b))))
+  };
+}
+function copySelection(){
+  const clip = buildSelectionClipboard();
+  if(!clip){ toast("Select nodes or zones to copy"); return; }
+  diagramClipboard = clip;
+  pasteCount = 0;
+  const total = clip.nodes.length + clip.zones.length;
+  toast(`Copied ${total} item${total === 1 ? "" : "s"}`);
+}
+function pasteClipboard(){
+  if(!diagramClipboard){ toast("Nothing copied"); return; }
+  const map = {};
+  const offset = 30 * (pasteCount + 1);
+  const nodes = diagramClipboard.nodes.map(n => {
+    const c = JSON.parse(JSON.stringify(n));
+    c.id = uid("n");
+    c.x = n.x + offset;
+    c.y = n.y + offset;
+    map[n.id] = c.id;
+    return c;
+  });
+  const zones = diagramClipboard.zones.map(z => {
+    const c = JSON.parse(JSON.stringify(z));
+    c.id = uid("z");
+    c.x = z.x + offset;
+    c.y = z.y + offset;
+    map[z.id] = c.id;
+    return c;
+  });
+  const edges = diagramClipboard.edges
+    .filter(e => map[e.a] && map[e.b])
+    .map(e => ({...JSON.parse(JSON.stringify(e)), id:uid("e"), a:map[e.a], b:map[e.b]}));
+  state.zones.push(...zones);
+  state.edges.push(...edges);
+  state.nodes.push(...nodes);
+  pasteCount += 1;
+  selection = new Set([...zones.map(z => z.id), ...nodes.map(n => n.id)]);
+  commit();
+  renderAll();
+}
 function duplicateSelection(){
   const picked = state.nodes.filter(n => selection.has(n.id));
   const zPicked = state.zones.filter(z => selection.has(z.id));
   if(!picked.length && !zPicked.length) return;
   const map = {};
-  const clones = picked.map(n => { const c = {...n, id:uid("n"), x:n.x + 30, y:n.y + 30}; map[n.id] = c.id; return c; });
-  state.nodes.push(...clones);
-  for(const e of state.edges.filter(e => map[e.a] && map[e.b]))
-    state.edges.push({...e, id:uid("e"), a:map[e.a], b:map[e.b]});
+  const clones = picked.map(n => {
+    const c = JSON.parse(JSON.stringify(n));
+    c.id = uid("n");
+    c.x = n.x + 30;
+    c.y = n.y + 30;
+    map[n.id] = c.id;
+    return c;
+  });
   const zClones = zPicked.map(z => {
-    const c = {...z, id:uid("z"), x:z.x + 30, y:z.y + 30};
-    if(Array.isArray(z.lanes)) c.lanes = [...z.lanes];
+    const c = JSON.parse(JSON.stringify(z));
+    c.id = uid("z");
+    c.x = z.x + 30;
+    c.y = z.y + 30;
+    map[z.id] = c.id;
     return c;
   });
   state.zones.push(...zClones);
+  for(const e of state.edges.filter(e => map[e.a] && map[e.b]))
+    state.edges.push({...JSON.parse(JSON.stringify(e)), id:uid("e"), a:map[e.a], b:map[e.b]});
+  state.nodes.push(...clones);
   commit();
   selection = new Set([...clones.map(c => c.id), ...zClones.map(c => c.id)]);
   renderAll();
@@ -10398,6 +10461,8 @@ window.addEventListener("keydown", e => {
   const mod = e.ctrlKey || e.metaKey;
   if(mod && e.key.toLowerCase() === "z" && !e.shiftKey){ undo(); e.preventDefault(); }
   else if((mod && e.key.toLowerCase() === "y") || (mod && e.shiftKey && e.key.toLowerCase() === "z")){ redo(); e.preventDefault(); }
+  else if(mod && e.key.toLowerCase() === "c"){ copySelection(); e.preventDefault(); }
+  else if(mod && e.key.toLowerCase() === "v"){ pasteClipboard(); e.preventDefault(); }
   else if(mod && e.key.toLowerCase() === "d"){ duplicateSelection(); e.preventDefault(); }
   else if(mod && e.key.toLowerCase() === "a"){ selection = new Set([...state.nodes.map(n => n.id), ...state.edges.map(x => x.id), ...state.zones.map(x => x.id)]); renderAll(); e.preventDefault(); }
   else if(mod && e.key.toLowerCase() === "s"){ exportJSON(); e.preventDefault(); }

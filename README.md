@@ -1,6 +1,6 @@
 # NetDraw
 
-Current version: `v1.1.7`
+Current version: `v1.1.8`
 
 NetDraw is a self-contained browser-based network diagram editor. The app lives in `NetDraw.html` and runs locally without a build step or server.
 
@@ -25,6 +25,7 @@ If `xdg-open` is not available, open the file from your browser with `File -> Op
 - Create multiple pages from bottom tabs; each page keeps its own canvas and view.
 - Build page-level journey walkthroughs with ordered reveal/highlight steps and captions.
 - Resize objects and zones from selection handles.
+- Copy and paste selected objects or groups with their internal connections.
 - Edit labels, metadata, disposition, effects, colors, lane names, and edge styles from the properties panel.
 - Pan by dragging empty canvas, zoom with the mouse wheel or toolbar, and fit the diagram to view.
 - Toggle light and dark mode from the top toolbar.
@@ -101,6 +102,8 @@ Use `Journey` to create a guided walkthrough for the current page. Add steps, pi
 - `Delete` / `Backspace`: Delete selection
 - `Ctrl+Z`: Undo
 - `Ctrl+Y` or `Ctrl+Shift+Z`: Redo
+- `Ctrl+C`: Copy selected objects
+- `Ctrl+V`: Paste copied objects
 - `Ctrl+D`: Duplicate selection
 - `Ctrl+A`: Select all
 - `Ctrl+S`: Save JSON

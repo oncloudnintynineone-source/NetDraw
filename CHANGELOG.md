@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.8 - 2026-08-10
+
+- Updated the displayed NetDraw version to `v1.1.8`.
+- Added in-page copy and paste for selected nodes, zones, and swimlanes.
+- Pasted groups preserve connections whose source and destination are both included in the copied selection.
+
 ## v1.1.7 - 2026-08-06
 
 - Updated the displayed NetDraw version to `v1.1.7`.
