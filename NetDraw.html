@@ -327,7 +327,7 @@
         <circle cx="5" cy="6" r="2.6"/><circle cx="19" cy="6" r="2.6"/><circle cx="12" cy="18" r="2.6"/>
         <path d="M7 7.5 10.5 16M17 7.5 13.5 16M7.6 6h8.8"/>
       </svg>
-      NetDraw <span class="sub">v1.1.8</span>
+      NetDraw <span class="sub">v1.1.9</span>
     </div>
 
     <div class="tgroup">
@@ -410,7 +410,7 @@
       </button>
     </div>
     <div class="tgroup">
-      <button id="btnClear" title="Clear canvas">
+      <button id="btnClear" title="Reset document">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h16M9 6V4h6v2M7 6l1 14h8l1-14M10 10v6M14 10v6"/></svg>
       </button>
     </div>
@@ -8557,7 +8557,7 @@ function normalizeState(doc){
   const edges = doc.edges.map(e => {
     if(!e || !endpointIds.has(e.a) || !endpointIds.has(e.b)) throw new Error("bad edge");
     const id = cleanId(e.id, "e");
-    if(edgeIds.has(id)) throw new Error("duplicate edge id");
+    if(endpointIds.has(id) || edgeIds.has(id)) throw new Error("duplicate element id");
     edgeIds.add(id);
     const bend = e.bend && finiteNum(e.bend.x) && finiteNum(e.bend.y) ? {x:e.bend.x, y:e.bend.y} : undefined;
     return {
@@ -8669,6 +8669,38 @@ function deleteCurrentPage(){
   activePageId = null;
   setActivePage((pages[Math.max(0, idx - 1)] || pages[0]).id, {skipPersist:true});
   toast("Page deleted");
+}
+function resetDocument(){
+  if(!confirm("Full reset: this will delete every page in this NetDraw document and start a new blank page. This cannot be undone. Continue?")) return;
+  if(present) exitPresent();
+  if(journeyOpen){
+    journeyOpen = false;
+    $("journey").style.display = "none";
+    $("btnJourney").classList.remove("active");
+  }
+  if(picking){
+    picking = null;
+    $("pickBar").style.display = "none";
+  }
+  pages = [makePage("Page 1", blankState(), blankView())];
+  activePageId = pages[0].id;
+  state = pages[0].state;
+  view = pages[0].view;
+  selection.clear();
+  diagramClipboard = null;
+  pasteCount = 0;
+  pendingFrom = null;
+  undoStack = [];
+  redoStack = [];
+  hideEditor();
+  clearTemp();
+  lastSnap = serialize();
+  renderPageTabs();
+  renderAll();
+  applyView();
+  setTool("select");
+  saveSoon();
+  toast("Reset to a new blank page");
 }
 function renderPageTabs(){
   const root = $("pageTabs");
@@ -10906,10 +10938,24 @@ async function startRecording(audioMode, musicFile, fmt){
     }catch(err){ toast("Could not play music file — recording without audio"); }
   }
   if(!fmt) fmt = detectRecFormats()[0];
-  if(!fmt){ toast("This browser does not support video recording"); return; }
+  if(!fmt){
+    audioCleanup();
+    videoStream.getTracks().forEach(t => t.stop());
+    toast("This browser does not support video recording");
+    return;
+  }
   const hasAudio = tracks.some(t => t.kind === "audio");
   const mime = hasAudio ? fmt.av : fmt.v;
-  const mr = new MediaRecorder(new MediaStream(tracks), {mimeType:mime, videoBitsPerSecond:6e6});
+  const stream = new MediaStream(tracks);
+  let mr;
+  try{
+    mr = new MediaRecorder(stream, {mimeType:mime, videoBitsPerSecond:6e6});
+  }catch(err){
+    audioCleanup();
+    videoStream.getTracks().forEach(t => t.stop());
+    toast("Recording could not start: " + err.message);
+    return;
+  }
   const chunks = [];
   mr.ondataavailable = e => { if(e.data.size) chunks.push(e.data); };
   mr.onstop = () => {
@@ -10925,17 +10971,27 @@ async function startRecording(audioMode, musicFile, fmt){
     catch(_){}
     building = false;
   }
+  let drawTimer = null, timer = null;
   // setInterval (not rAF): keeps capturing even when the tab loses focus/visibility
-  const drawTimer = setInterval(() => {
+  drawTimer = setInterval(() => {
     if(!running) return;
     if(lastImg){ ctx.drawImage(lastImg, 0, 0, physW, physH); drawCount++; }
     pump();
   }, 33);
   pump();
-  mr.start(250);
   const btn = $("btnRec");
+  try{
+    mr.start(250);
+  }catch(err){
+    running = false;
+    clearInterval(drawTimer);
+    audioCleanup();
+    videoStream.getTracks().forEach(t => t.stop());
+    toast("Recording could not start: " + err.message);
+    return;
+  }
   btn.classList.add("recon");
-  const timer = setInterval(() => {
+  timer = setInterval(() => {
     const s = Math.floor((performance.now() - t0) / 1000);
     btn.querySelector("span").textContent = `Stop ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   }, 500);
@@ -11030,17 +11086,7 @@ $("btnOpen").onclick = () => $("fileInput").click();
 $("fileInput").addEventListener("change", e => { if(e.target.files[0]) importJSON(e.target.files[0]); e.target.value = ""; });
 $("pageAdd").onclick = addPage;
 $("pageDelete").onclick = deleteCurrentPage;
-$("btnClear").onclick = () => {
-  if(!state.nodes.length && !state.edges.length && !state.zones.length) return;
-  const p = activePage();
-  if(confirm(`Clear "${p ? p.name : "current page"}"? (You can still undo.)`)){
-    state = blankState();
-    persistCurrentPage();
-    selection.clear();
-    commit();
-    renderAll();
-  }
-};
+$("btnClear").onclick = resetDocument;
 
 /* ---------- sample diagram ---------- */
 function sampleState(){

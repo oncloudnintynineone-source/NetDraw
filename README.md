@@ -1,6 +1,6 @@
 # NetDraw
 
-Current version: `v1.1.8`
+Current version: `v1.1.9`
 
 NetDraw is a self-contained browser-based network diagram editor. The app lives in `NetDraw.html` and runs locally without a build step or server.
 
@@ -25,14 +25,15 @@ If `xdg-open` is not available, open the file from your browser with `File -> Op
 - Create multiple pages from bottom tabs; each page keeps its own canvas and view.
 - Build page-level journey walkthroughs with ordered reveal/highlight steps and captions.
 - Resize objects and zones from selection handles.
-- Copy and paste selected objects or groups with their internal connections.
+- Copy and paste selected objects or groups with their internal connections using NetDraw's in-page clipboard.
 - Edit labels, metadata, disposition, effects, colors, lane names, and edge styles from the properties panel.
 - Pan by dragging empty canvas, zoom with the mouse wheel or toolbar, and fit the diagram to view.
 - Toggle light and dark mode from the top toolbar.
 - Collapse and expand individual palette sections, or use the top palette control to collapse or expand all sections at once.
 - Save and load diagrams as one JSON file, including all pages.
+- Reset the full document from the upper-right trash button after a warning confirmation.
 - Export diagrams as PNG, SVG, or animated GIF. PNG and GIF exports include NetDraw and the current version in image software metadata.
-- Record the visible canvas as video with optional microphone or music audio when supported by the browser.
+- Record the visible canvas as video with optional microphone or music audio; supported browsers offer available WebM/MP4 recording formats.
 
 ## Local Browser Storage
 
@@ -44,6 +45,8 @@ On startup:
 - If no valid local diagram exists, NetDraw starts with a clear canvas.
 
 Use the `Save` button to export a portable JSON file containing every page in the document. Use `Open` to import a saved JSON diagram. Older single-page NetDraw JSON files are imported as a one-page document.
+
+The upper-right trash button performs a full reset: after confirmation, NetDraw deletes every page in the current document and starts a new blank `Page 1`.
 
 ## Pages
 

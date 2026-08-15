@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.1.9 - 2026-08-16
+
+- Updated the displayed NetDraw version to `v1.1.9`.
+- Hardened JSON import validation so connection IDs cannot collide with node or zone IDs.
+- Cleaned up video and audio capture resources when recording cannot start.
+- Changed the upper-right trash button to warn before resetting the full document to a new blank page.
+- Clarified README wording for the in-page copy/paste clipboard and browser-supported recording formats.
+
 ## v1.1.8 - 2026-08-10
 
 - Updated the displayed NetDraw version to `v1.1.8`.
