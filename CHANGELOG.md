@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.2.0 - 2026-10-02
+
+- Updated the displayed NetDraw version to `v1.2.0`.
+- Added a new **Note** object type (Annotations palette section) for free-form text and annotations: a title chip, wrapped body text, rounded solid-bordered box, and automatic growth to fit the content.
+- Notes are edited from the properties panel (Title and Text), support the same filter/layer tagging, accent color, ordering, resizing, copy/paste, and connections as other objects, and participate in object search via their body text.
+- Existing saved diagrams load unchanged; the new `text` field is optional and validated on import.
+
 ## v1.1.13 - 2026-10-02
 
 - Updated the displayed NetDraw version to `v1.1.13`.

@@ -425,7 +425,7 @@
         <circle cx="5" cy="6" r="2.6"/><circle cx="19" cy="6" r="2.6"/><circle cx="12" cy="18" r="2.6"/>
         <path d="M7 7.5 10.5 16M17 7.5 13.5 16M7.6 6h8.8"/>
       </svg>
-      NetDraw <span class="sub">v1.1.13</span>
+      NetDraw <span class="sub">v1.2.0</span>
     </div>
 
     <div class="tgroup">
@@ -450,7 +450,7 @@
     </div>
 
     <div class="tgroup">
-      <button id="btnSearch" class="searchbox" title="Search objects by label, device name, IP address or DNS name">
+      <button id="btnSearch" class="searchbox" title="Search objects by label, device name, IP address, DNS name or note text">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
         <span>Search objects…</span>
       </button>
@@ -783,7 +783,8 @@ const ICONS = {
   aautoerp:'<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 9h8M8 12h8M8 15h4"/><text x="12" y="14.4" text-anchor="middle" font-size="5.5" font-weight="700" fill="currentColor" stroke="none">ERP</text>',
   aautoplatform:'<rect x="3.5" y="5" width="6" height="6" rx="1.3"/><rect x="14.5" y="5" width="6" height="6" rx="1.3"/><rect x="9" y="14" width="6" height="6" rx="1.3"/><path d="M9.5 8h5M6.5 11l3.2 3.1M17.5 11l-3.2 3.1"/>',
   aautorecovery:'<path d="M7 7a7 7 0 1 1-1.7 7"/><path d="M5 6.5v4h4"/><path d="M12 9v4l2.5 1.5"/>',
-  aautohighavailability:'<rect x="4" y="5" width="6.8" height="14" rx="1.5"/><rect x="13.2" y="5" width="6.8" height="14" rx="1.5"/><path d="M7.4 8.5h.01M7.4 12h.01M7.4 15.5h.01M16.6 8.5h.01M16.6 12h.01M16.6 15.5h.01"/><path d="M10.8 10h2.4M10.8 14h2.4"/>'
+   aautohighavailability:'<rect x="4" y="5" width="6.8" height="14" rx="1.5"/><rect x="13.2" y="5" width="6.8" height="14" rx="1.5"/><path d="M7.4 8.5h.01M7.4 12h.01M7.4 15.5h.01M16.6 8.5h.01M16.6 12h.01M16.6 15.5h.01"/><path d="M10.8 10h2.4M10.8 14h2.4"/>',
+   note:'<path d="M5 3.5h14A1.5 1.5 0 0 1 20.5 5v9l-5.5 5.5H5A1.5 1.5 0 0 1 3.5 18V5A1.5 1.5 0 0 1 5 3.5z"/><path d="M20.5 14H16a1 1 0 0 0-1 1v4.5"/><path d="M7.5 8h9M7.5 11.5h5.5"/>'
 };
 
 /* effects (status conditions) that can be applied to any node */
@@ -932,8 +933,10 @@ const TYPES = {
   ot:           {name:"OT Device",          accent:"#fb923c", fields:F_NETDEV},
   fax:          {name:"Fax",                accent:"#94a3b8", fields:F_ENDPT},
   cardreader:   {name:"Card Reader",        accent:"#f9a8d4", fields:F_ENDPT},
-  barcodereader:{name:"Barcode Reader",     accent:"#a5b4fc", fields:F_ENDPT},
-  /* process-flow shapes: the shape itself is the node, label centred inside */
+   barcodereader:{name:"Barcode Reader",     accent:"#a5b4fc", fields:F_ENDPT},
+   /* annotations: title chip + free-form body text, solid rounded box (see renderNode) */
+   note:         {name:"Note",               accent:"#fbbf24", note:true, fields:[], labelCaption:"Title", defaultLabel:"Note"},
+   /* process-flow shapes: the shape itself is the node, label centred inside */
   startend:     {name:"Start / End",   accent:"#34d399", shape:"terminator", fields:["notes"], defaultLabel:"Start"},
   process:      {name:"Process",       accent:"#60a5fa", shape:"process",    fields:["owner","notes"]},
   decision:     {name:"Decision",      accent:"#fbbf24", shape:"decision",   fields:["notes"], defaultLabel:"Decision?"},
@@ -8570,6 +8573,7 @@ AZURE_SERVICE_ITEMS.forEach(s => {
   TYPES[s.id] = {name:s.name, accent:s.accent, azureSvg:s.svg, azureViewBox:s.viewBox, fields:["region","subscription","resourceGroup","notes"], labelCaption:"Resource label", azureCategory:s.category};
 });
 const PALETTE_GROUPS = [
+  {title:"Annotations",     items:["note"]},
   {title:"Network",         items:["internet","cloud","router","switch","wifi","loadbalancer","asn","ipaddress"]},
   {title:"Security & Edge", items:["firewall","waf","proxy","cdn","apigateway"]},
   {title:"Servers",         items:["server","mainframe","solaris","serverappliance","webserver","appserver","mgmtserver","updateserver","backupserver","telephony","hypervisor","esx"]},
@@ -8714,6 +8718,7 @@ function normalizeState(doc){
     const out = {...n, id, x:n.x, y:n.y, label: typeof n.label === "string" && n.label.trim() ? n.label : (T.defaultLabel || T.name)};
     if(finiteNum(n.w)) out.w = Math.max(1, n.w);
     if(finiteNum(n.h)) out.h = Math.max(1, n.h);
+    if(T.note) out.text = typeof n.text === "string" ? n.text : "";
     const tags = normalizeTags(n.tags);
     if(tags.length) out.tags = tags; else delete out.tags;
     return out;
@@ -8959,6 +8964,12 @@ const ZONE_LABEL_FONT = "600 11px " + FONT_STACK;
 const LANE_TITLE_FONT = "700 12px " + FONT_STACK;
 const LABEL_MAX_W = 240, EDGE_LABEL_MAX_W = 160, ZONE_LABEL_MAX_W = 200, SHAPE_TEXT_MAX = 240;
 const NODE_LABEL_LH = 13, SHAPE_LABEL_LH = 14, EDGE_LABEL_LH = 13, ZONE_LABEL_LH = 13, LANE_TITLE_LH = 15;
+/* annotation notes: title chip + wrapped body text */
+const NOTE_BODY_FONT = "11.5px " + FONT_STACK;
+const NOTE_BODY_LH = 15, NOTE_HEAD = 34, NOTE_PAD = 14;
+const NOTE_MIN_W = 120, NOTE_MIN_H = 62, NOTE_MAX_W = 360;
+function noteTitleLines(n){ return wrapText(n.label, NOTE_MAX_W - 40, ZONE_LABEL_FONT); }
+function noteBodyLines(n, W){ return wrapText(n.text || "", Math.max(60, W - NOTE_PAD * 2), NOTE_BODY_FONT); }
 let _measureCtx = null, _measureCache = new Map();
 function measureTextWidth(s, font){
   const key = font + "\n" + s;
@@ -9059,6 +9070,11 @@ function nodeLabelLines(n){
 }
 function autoNodeW(n){
   const T = TYPES[n.type];
+  if(T.note){
+    const tW = Math.max(...noteTitleLines(n).map(s => measureTextWidth(s, ZONE_LABEL_FONT))) + 34;
+    const bW = Math.max(...noteBodyLines(n, NOTE_MAX_W).map(s => measureTextWidth(s, NOTE_BODY_FONT))) + NOTE_PAD * 2;
+    return clamp(Math.max(tW, bW, NOTE_MIN_W), NOTE_MIN_W, NOTE_MAX_W);
+  }
   if(T.shape){
     if(T.shape === "connector"){
       const lines = wrapText(n.label, 90, SHAPE_LABEL_FONT);
@@ -9076,6 +9092,7 @@ function autoNodeW(n){
 }
 function autoNodeH(n){
   const T = TYPES[n.type];
+  if(T.note) return Math.max(NOTE_MIN_H, NOTE_HEAD + noteBodyLines(n, nodeW(n)).length * NOTE_BODY_LH + NOTE_PAD);
   if(T.shape){
     if(T.shape === "connector") return autoNodeW(n);
     const lines = wrapText(n.label, shapeWrapWidth(T, nodeW(n)), SHAPE_LABEL_FONT);
@@ -9086,6 +9103,7 @@ function autoNodeH(n){
 }
 function minNodeSize(n){
   const T = TYPES[n.type];
+  if(T.note) return {w:NOTE_MIN_W, h:NOTE_MIN_H};
   if(T.shape){
     if(T.shape === "connector") return {w:28, h:28};
     if(T.shape === "decision") return {w:70, h:48};
@@ -9158,7 +9176,20 @@ function renderNode(n){
   }
   if(sel) g.appendChild(el("rect", {x:-5, y:-5, width:W+10, height:H+10, rx:18, fill:"none", stroke:acc, "stroke-opacity":.4, "stroke-width":1.6}));
   const T = TYPES[n.type];
-  if(T.shape){
+  if(T.note){
+    g.appendChild(el("rect", {class:"card", width:W, height:H, rx:12, fill:acc, "fill-opacity":.08,
+      stroke: sel ? acc : tc("neutralStroke"), "stroke-opacity": sel ? 1 : .9,
+      "stroke-width": sel ? 1.8 : 1.4, filter:"url(#nodeShadow)"}));
+    const tLines = noteTitleLines(n);
+    const tw = Math.max(...tLines.map(s => measureTextWidth(s, ZONE_LABEL_FONT))) + 22;
+    const th = tLines.length * ZONE_LABEL_LH + 9;
+    g.appendChild(el("rect", {x:10, y:10, width:tw, height:th, rx:8, fill:tc("chipBg"),
+      stroke:acc, "stroke-opacity":.6, "stroke-width":1}));
+    g.appendChild(labelText(tLines, {x:10 + tw/2, y:10 + th/2 + 3.8, anchor:"middle", size:11,
+      weight:600, fill:acc, lineHeight:ZONE_LABEL_LH}));
+    g.appendChild(labelText(noteBodyLines(n, W), {x:NOTE_PAD, y:NOTE_HEAD + 12, anchor:"start",
+      size:11.5, fill:tc("nodeText"), lineHeight:NOTE_BODY_LH}));
+  } else if(T.shape){
     const attrs = {class:"card", fill:"url(#cardGrad)", stroke:acc,
       "stroke-opacity": sel ? 1 : .7, "stroke-width": sel ? 1.8 : 1.4, filter:"url(#nodeShadow)"};
     let body;
@@ -10048,7 +10079,8 @@ const SEARCH_FIELDS = [
   {k:"label", name:"Label",       rank:0},
   {k:"dev",   name:"Device name", rank:1},
   {k:"ip",    name:"IP address",  rank:2},
-  {k:"dns",   name:"DNS name",    rank:3}
+  {k:"dns",   name:"DNS name",    rank:3},
+  {k:"text",  name:"Note text",   rank:4}
 ];
 const SEARCH_FIELDS_LABEL = [SEARCH_FIELDS[0]];
 const SEARCH_MAX = 60;
@@ -10107,7 +10139,7 @@ function renderSearchResults(){
   searchIndex = searchHits.length ? 0 : -1;
   const box = $("sResults");
   if(!q){
-    box.innerHTML = '<div class="sempty">Type to search labels, device names, IP addresses and DNS names on this page.</div>';
+    box.innerHTML = '<div class="sempty">Type to search labels, device names, IP addresses, DNS names and note text on this page.</div>';
   } else if(!searchHits.length){
     box.innerHTML = '<div class="sempty">No matches for “' + esc(q) + '”.</div>';
   } else {
@@ -10171,7 +10203,7 @@ function openSearch(){
     <div class="sbody">
       <div class="sinputwrap">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
-        <input type="text" id="sInput" placeholder="Search label, device name, IP address or DNS name…" spellcheck="false" autocomplete="off" aria-label="Search objects">
+        <input type="text" id="sInput" placeholder="Search label, device name, IP address, DNS name or note text…" spellcheck="false" autocomplete="off" aria-label="Search objects">
       </div>
       <div id="sResults" class="sresults"></div>
     </div>
@@ -11004,6 +11036,10 @@ svg.addEventListener("dblclick", e => {
   else if(edgeG) openEditor({kind:"edge", id:edgeG.getAttribute("data-edge")});
 });
 function openEditor(target){
+  if(target.kind === "node"){
+    const nn = nodeById(target.id);
+    if(!nn || TYPES[nn.type].note) return;
+  }
   editTarget = target;
   let sp, val;
   if(target.kind === "node"){
@@ -11124,6 +11160,7 @@ function updateMultiProps(){
   const allSwim = allZones && zones.every(z => z.kind === "swimlane");
   const hasEdges = edges.length > 0;
   const sameNodeType = allNodes && nodes.every(n => n.type === nodes[0].type);
+  const allNotes = allNodes && nodes.every(n => TYPES[n.type].note);
 
   const orderControls = () => `
       <div class="row"><label>Object order</label><div class="orderBtns">
@@ -11156,7 +11193,7 @@ function updateMultiProps(){
     : `${targets.length} objects`;
 
   const labelVal = commonValue(targets, t => t.obj.label);
-  const labelHTML = `<div class="row"><label>Label</label><textarea id="pLabel" rows="2" placeholder="${
+  const labelHTML = `<div class="row"><label>${allNotes ? "Title" : "Label"}</label><textarea id="pLabel" rows="2" placeholder="${
     labelVal === MIXED ? "Multiple values" : ""}">${labelVal === MIXED ? "" : esc(labelVal || "")}</textarea></div>`;
 
   const colorApplicable = !hasEdges && (nodes.length > 0 || zones.length > 0);
@@ -11219,6 +11256,12 @@ function updateMultiProps(){
       }
       return `<div class="row"><label>${esc(m.cap)}</label>${control}</div>`;
     }).join("");
+    if(allNotes){
+      const cv = commonValue(nodes, n => n.text);
+      nodeHTML += `
+      <div class="row"><label>Text</label><textarea id="pNoteText" rows="6" placeholder="${
+        cv === MIXED ? "Multiple values" : "Annotation text…"}">${cv === MIXED ? "" : esc(cv || "")}</textarea></div>`;
+    } else {
     nodeHTML += `
       <div class="row"><label>Disposition</label><div class="fxchips">${
         Object.entries(DISPOSITIONS).map(([k, dd]) => {
@@ -11236,6 +11279,7 @@ function updateMultiProps(){
           return `<div class="fxchip ${any && !all ? "partial" : ""}" data-fx="${k}" style="${style}">${f.name}</div>`;
         }).join("")
       }</div></div>`;
+    }
   }
 
   let edgeHTML = "";
@@ -11299,6 +11343,15 @@ function updateMultiProps(){
   }
 
   if(allNodes){
+    if(allNotes){
+      const ta = propsEl.querySelector("#pNoteText");
+      ta.addEventListener("change", e => {
+        const v = e.target.value;
+        for(const n of nodes){ if(v === "") delete n.text; else n.text = v; }
+        commit(); renderAll();
+      });
+      ta.addEventListener("keydown", e => { e.stopPropagation(); });
+    }
     for(const f of nodeFields){
       const supp = nodes.filter(n => (TYPES[n.type].fields || []).includes(f));
       wireMultiText("#pF_" + f, v => {
@@ -11363,7 +11416,29 @@ function updateProps(){
     inp.addEventListener("change", e => { fn(e.target.value.trim()); commit(); renderAll(); });
     inp.addEventListener("keydown", e => { e.stopPropagation(); if(e.key === "Enter" && inp.tagName !== "TEXTAREA") e.target.blur(); });
   };
-  if(n){
+  if(n && TYPES[n.type].note){
+    propsEl.innerHTML = `
+      <h4>Note</h4>
+      <div class="row"><label>Title</label><textarea id="pLabel" rows="2" placeholder="Note title…">${esc(n.label)}</textarea></div>
+      <div class="row"><label>Text</label><textarea id="pText" rows="6" placeholder="Annotation text…">${esc(n.text || "")}</textarea></div>
+      ${filterChipsHTML([n])}
+      <div class="row"><label>Accent color</label><div class="swatches">${
+        SWATCHES.map(c => `<div class="sw ${accentOf(n) === c ? "on" : ""}" data-c="${c}" style="background:${c}"></div>`).join("")
+      }</div></div>
+      ${orderControls()}
+      <button class="danger" id="pDelete">Delete note</button>`;
+    wireText("#pLabel", v => { if(v) n.label = v; });
+    const pText = propsEl.querySelector("#pText");
+    pText.addEventListener("change", e => {
+      const v = e.target.value;
+      if(v !== (n.text || "")){ n.text = v; commit(); renderAll(); }
+    });
+    pText.addEventListener("keydown", e => { e.stopPropagation(); });
+    propsEl.querySelectorAll(".sw").forEach(sw => sw.addEventListener("click", () => { n.accent = sw.dataset.c; commit(); renderAll(); }));
+    wireTagChips([n]);
+    wireOrderControls();
+    propsEl.querySelector("#pDelete").addEventListener("click", deleteSelection);
+  } else if(n){
     const T = TYPES[n.type];
     const fieldRows = (T.fields || []).map(f => {
       const d = FIELD_DEFS[f];

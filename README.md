@@ -1,6 +1,6 @@
 # NetDraw
 
-Current version: `v1.1.13`
+Current version: `v1.2.0`
 
 NetDraw is a self-contained browser-based network diagram editor. The app lives in `NetDraw.html` and runs locally without a build step or server.
 
@@ -22,6 +22,7 @@ If `xdg-open` is not available, open the file from your browser with `File -> Op
 - Add AWS, Google Cloud Platform, Azure, HULFT, and A-AUTO service objects from palette sections below Docker, with cloud service names sourced from the official provider icon packages.
 - Connect nodes and zones with styled links, labels, structured routes, arrows, animated traffic, and sneakernet paths.
 - Create zones and swimlanes for network segments and process lanes.
+- Add free-form **Notes** from the palette's Annotations section: each note has a title chip and wrapped body text, auto-grows to fit, and can still be tagged with filters/layers or connected like any other object.
 - Create multiple pages from bottom tabs; each page keeps its own canvas and view.
 - Build page-level journey walkthroughs with ordered reveal/highlight steps and captions.
 - Search the current page by object label, device name, IP address, or DNS name from the topbar search box, then jump straight to a match.
@@ -71,6 +72,12 @@ Select a node to show corner resize handles, then drag a handle to resize the ob
 The Effects / status list includes operational states such as `Down`, `Missing`, and `Unavailable`, along with security-focused states.
 
 Select a node, zone, swimlane, or connection to move it backward, forward, to the back, or to the front from the properties panel. Ordering is applied inside the selected item's drawing layer.
+
+## Notes
+
+Add a **Note** from the **Annotations** palette section to place free-form text on the canvas. A note is drawn as a rounded, solid-bordered box with a title chip at the top-left and wrapped body text underneath; it grows automatically to fit its content.
+
+Select a note and edit its **Title** and **Text** in the properties panel. Notes support the same filters/layers tagging, accent color, ordering, resizing, copy/paste, and connections as other objects, and their text is included in object search.
 
 ## AWS
 
