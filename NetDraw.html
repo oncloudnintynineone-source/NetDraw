@@ -228,7 +228,32 @@
   #jPlay.jprimary{height:36px; padding:0 18px; background:#123047; color:#7dd3fc; border:1px solid #1e4f6e; font-weight:600;}
   #jPlay.jprimary:hover{background:#163a56;}
 
-  /* ---------- filters / layers ---------- */
+  /* ---------- filters: floating view checklist ---------- */
+  #filterViews{
+    position:absolute; top:14px; left:14px; z-index:40; width:212px;
+    background:var(--props-bg); backdrop-filter:blur(8px);
+    border:1px solid var(--border); border-radius:12px; overflow:hidden;
+    box-shadow:0 14px 40px rgba(0,0,0,.45);
+  }
+  #filterViews.collapsed .fvlist{display:none;}
+  .fvhead{display:flex; align-items:center; gap:5px; padding:8px 9px; cursor:pointer; user-select:none;}
+  .fvtitle{flex:1; font-size:11px; font-weight:700; letter-spacing:.7px; text-transform:uppercase; color:var(--faint);}
+  .fvcount{font-size:10px; color:var(--faint); font-variant-numeric:tabular-nums;}
+  .fvhead button{
+    width:22px; height:22px; min-width:22px; padding:0; justify-content:center;
+    background:var(--panel2); border:1px solid var(--border); color:var(--muted); border-radius:6px; font-size:12px; line-height:1;
+  }
+  .fvhead button:hover{background:var(--button-hover); color:var(--text);}
+  .fvhead button:disabled{opacity:.35; cursor:default;}
+  .fvlist{padding:0 7px 7px; display:flex; flex-direction:column; gap:1px; max-height:44vh; overflow:auto;}
+  .fvrow{display:flex; align-items:center; gap:8px; padding:5px 7px; border-radius:7px; cursor:pointer; font-size:12px; color:var(--muted);}
+  .fvrow:hover{background:var(--panel2); color:var(--text);}
+  .fvrow input[type=checkbox]{flex:0 0 auto; margin:0; accent-color:#38bdf8; cursor:pointer;}
+  .fvdot{flex:0 0 11px; width:11px; height:11px; border-radius:4px;}
+  .fvname{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .fvempty{font-size:11px; color:var(--faint); font-style:italic; padding:3px 7px 5px;}
+
+  /* ---------- filters: editor modal ---------- */
   #filters{
     position:absolute; inset:0; z-index:140; display:none;
     align-items:center; justify-content:center;
@@ -245,11 +270,9 @@
   .fcolors .sw{width:20px; height:20px;}
   .flist{display:flex; flex-direction:column; gap:8px;}
   .frow{display:flex; align-items:center; gap:9px; background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:9px 11px;}
-  .frow.off{opacity:.6;}
   .fdot{flex:0 0 14px; width:14px; height:14px; border-radius:5px; cursor:pointer;}
   .frow input[type=text]{flex:1; min-width:0; background:var(--panel); border:1px solid var(--border); color:var(--text); border-radius:7px; padding:6px 9px; font-size:12.5px; font-family:inherit; outline:none;}
   .frow input[type=text]:focus{border-color:#2f6fa8;}
-  .ftoggle{display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--muted); cursor:pointer; white-space:nowrap;}
   .frow .fdanger{height:28px; min-width:28px; padding:0 9px; background:var(--panel); border:1px solid #58202f; color:#fda4af;}
   .frow .fdanger:hover{background:#4c1b2b;}
   .fcount{font-size:12px; color:var(--faint);}
@@ -267,7 +290,7 @@
   #pickBar button{height:32px; padding:0 14px; font-weight:600; border:1px solid var(--border); background:var(--panel2); color:var(--text);}
   #pickUse{background:#123047; color:#7dd3fc; border-color:#1e4f6e;}
   #pickBar button:hover{filter:brightness(1.15);}
-  body.presenting #palette, body.presenting #topbar .tgroup, body.presenting #hintbar, body.presenting #journey, body.presenting #filters, body.presenting #pagebar{display:none !important;}
+  body.presenting #palette, body.presenting #topbar .tgroup, body.presenting #hintbar, body.presenting #journey, body.presenting #filters, body.presenting #filterViews, body.presenting #pagebar{display:none !important;}
   body.presenting #topbar{justify-content:center;}
   body.presenting #logo{margin:0;}
   #presentBar{
@@ -483,6 +506,7 @@
       </svg>
 
       <div id="props"></div>
+      <div id="filterViews"></div>
       <div id="journey"></div>
       <div id="filters"></div>
       <div id="presentBar">
@@ -558,6 +582,7 @@ const DOC_VERSION = 2;
 const APP_NAME = "NetDraw";
 const THEME_KEY = "netdraw.theme.v1";
 const PALETTE_KEY = "netdraw.palette.v1";
+const FILTER_VIEWS_KEY = "netdraw.filterViews.v1";
 const THEMES = {
   dark: {
     bg:"#0b1120", grid:"#1b2742", cardTop:"#1c2537", cardBottom:"#141b2b",
@@ -8517,6 +8542,8 @@ let activePageId = null;
 let filters = [];                 // document-wide filter/layer definitions {id,name,color}
 let activeFilters = new Set();    // transient ids of enabled filters
 let filtersOpen = false;
+let filterLit = null;             // cached ids lit by active filters (incl. ancestors), or null
+let filterViewsCollapsed = (() => { try{ return localStorage.getItem(FILTER_VIEWS_KEY) === "1"; }catch(_){ return false; } })();
 let tool = "select";
 let selection = new Set();        // node, edge, and zone ids
 let diagramClipboard = null;
@@ -8800,6 +8827,7 @@ function resetDocument(){
   filters = [];
   activeFilters.clear();
   updateFilterBadge();
+  renderFilterViews();
   selection.clear();
   diagramClipboard = null;
   pasteCount = 0;
@@ -9482,6 +9510,7 @@ function renderZone(z){
 }
 
 function renderAll(){
+  filterLit = present ? null : computeFilterLit();
   zonesLayer.innerHTML = "";
   for(const z of state.zones){
     const s = elemState(z.id);
@@ -9513,19 +9542,55 @@ function renderAll(){
   ensureSneak();
 }
 
-/* filter/layer matching: an object matches if it carries an active tag; an edge also
-   matches when both of its endpoints match. No active filters => everything shows. */
-function hasActiveTag(o){ return objTags(o).some(id => activeFilters.has(id)); }
-function endpointFilterMatch(id){
-  if(!activeFilters.size) return true;
-  const o = nodeById(id) || zoneById(id);
-  return !!(o && hasActiveTag(o));
+/* filter/layer matching. An object is lit when it carries an active tag, or when both
+   endpoints of a connection carry an active tag. Every lit object also keeps its
+   containing zones/swimlanes (parents, grandparents, …) lit. No active filters => all on. */
+function objHasActiveTag(o){ return objTags(o).some(id => activeFilters.has(id)); }
+function directParents(obj){
+  if(!obj) return [];
+  const n = nodeById(obj.id);
+  if(n) return state.zones.filter(z => inZone(n, z));
+  const z = zoneById(obj.id);
+  if(z) return state.zones.filter(p => p.id !== z.id && zoneContains(p, z));
+  const e = edgeById(obj.id);
+  if(e){
+    const a = endpointById(e.a), b = endpointById(e.b);
+    if(!a || !b) return [];
+    let m;
+    try{ m = edgeGeom(a, b, e.route, e).mid; }catch(_){ return []; }
+    return state.zones.filter(z => m.x > z.x && m.x < z.x + z.w && m.y > z.y && m.y < z.y + z.h);
+  }
+  return [];
 }
-function filterShows(id, obj){
-  if(!activeFilters.size) return true;
-  if(!obj) return true;
-  if(edgeById(id)) return hasActiveTag(obj) || (endpointFilterMatch(obj.a) && endpointFilterMatch(obj.b));
-  return hasActiveTag(obj);
+function ancestorZonesOf(obj, out){
+  const stack = directParents(obj);
+  while(stack.length){
+    const z = stack.pop();
+    if(out.has(z.id)) continue;
+    out.add(z.id);
+    for(const p of state.zones) if(p.id !== z.id && !out.has(p.id) && zoneContains(p, z)) stack.push(p);
+  }
+}
+function computeFilterLit(){
+  if(!activeFilters.size || present) return null;
+  const lit = new Set();
+  const nodes = state.nodes, zones = state.zones, edges = state.edges;
+  for(const o of nodes) if(objHasActiveTag(o)) lit.add(o.id);
+  for(const o of zones) if(objHasActiveTag(o)) lit.add(o.id);
+  for(const o of edges) if(objHasActiveTag(o)) lit.add(o.id);
+  for(const e of edges){
+    if(lit.has(e.id)) continue;
+    const a = nodeById(e.a) || zoneById(e.a);
+    const b = nodeById(e.b) || zoneById(e.b);
+    if(a && b && objHasActiveTag(a) && objHasActiveTag(b)) lit.add(e.id);
+  }
+  const ancestors = new Set();
+  for(const id of [...lit]){
+    const o = nodeById(id) || zoneById(id) || edgeById(id);
+    if(o) ancestorZonesOf(o, ancestors);
+  }
+  for(const id of ancestors) lit.add(id);
+  return lit;
 }
 let present = null, pjHidden = new Set(), pjOn = new Set(), pjHasHL = false;
 function elemState(id){
@@ -9533,7 +9598,7 @@ function elemState(id){
     if(pjHidden.has(id)) return "hidden";
     return pjOn.has(id) ? "on" : (pjHasHL ? "dim" : "on");
   }
-  if(activeFilters.size && !filterShows(id, nodeById(id) || edgeById(id) || zoneById(id))) return "dim";
+  if(activeFilters.size && filterLit && !filterLit.has(id)) return "dim";
   return "on";
 }
 function dimGroup(g){
@@ -9768,20 +9833,65 @@ function updateFilterBadge(){
   if(activeFilters.size){ b.style.display = ""; b.textContent = activeFilters.size; }
   else b.style.display = "none";
 }
-function buildFiltersModal(){
+/* floating top-left checklist: enable / disable filter views */
+function renderFilterViews(){
+  const root = $("filterViews");
+  if(!root) return;
   const rows = filters.map(f => {
     const on = activeFilters.has(f.id);
-    return `<div class="frow ${on ? "" : "off"}" data-fid="${f.id}">
+    return `<label class="fvrow" data-fid="${f.id}">
+      <input type="checkbox" class="fvcheck" data-fid="${f.id}" ${on ? "checked" : ""}>
+      <span class="fvdot" style="background:${esc(f.color)}"></span>
+      <span class="fvname">${esc(f.name)}</span>
+    </label>`;
+  }).join("");
+  root.classList.toggle("collapsed", filterViewsCollapsed);
+  root.innerHTML = `
+    <div class="fvhead" id="fvHead">
+      <span class="fvtitle">Filter views</span>
+      <span class="fvcount">${activeFilters.size}/${filters.length}</span>
+      <button id="fvClear" title="Clear active filters" ${activeFilters.size ? "" : "disabled"}>⨯</button>
+      <button id="fvEdit" title="Edit filters">⚙</button>
+      <button id="fvCollapse" title="${filterViewsCollapsed ? "Expand" : "Collapse"}">${filterViewsCollapsed ? "▸" : "▾"}</button>
+    </div>
+    <div class="fvlist">${rows || '<div class="fvempty">No filters yet — click the gear to add one.</div>'}</div>`;
+  $("fvHead").addEventListener("click", e => {
+    if(e.target.closest("button")) return;
+    filterViewsCollapsed = !filterViewsCollapsed; saveFilterViewsPref(); renderFilterViews();
+  });
+  $("fvCollapse").addEventListener("click", () => {
+    filterViewsCollapsed = !filterViewsCollapsed; saveFilterViewsPref(); renderFilterViews();
+  });
+  $("fvEdit").addEventListener("click", toggleFilters);
+  $("fvClear").addEventListener("click", () => {
+    activeFilters.clear(); updateFilterBadge(); renderAll(); updateFilterViewsState();
+  });
+  root.querySelectorAll(".fvcheck").forEach(cb =>
+    cb.addEventListener("change", () => toggleFilterActive(cb.dataset.fid, cb.checked)));
+}
+/* refresh header count / clear state without rebuilding rows (keeps checkbox focus) */
+function updateFilterViewsState(){
+  const root = $("filterViews"); if(!root) return;
+  const count = root.querySelector(".fvcount");
+  if(count) count.textContent = `${activeFilters.size}/${filters.length}`;
+  const clear = root.querySelector("#fvClear");
+  if(clear) clear.disabled = !activeFilters.size;
+  root.querySelectorAll(".fvcheck").forEach(cb => { cb.checked = activeFilters.has(cb.dataset.fid); });
+}
+function saveFilterViewsPref(){
+  try{ localStorage.setItem(FILTER_VIEWS_KEY, filterViewsCollapsed ? "1" : "0"); }catch(_){}
+}
+/* editor modal: create / rename / recolor / delete (enabling lives in the floating checklist) */
+function buildFiltersModal(){
+  const rows = filters.map(f => `<div class="frow" data-fid="${f.id}">
       <span class="fdot" data-fcolor="${f.id}" style="background:${esc(f.color)}" title="Click to cycle color"></span>
       <input type="text" class="fname" data-fid="${f.id}" value="${esc(f.name)}" maxlength="40">
-      <label class="ftoggle"><input type="checkbox" class="factive" data-fid="${f.id}" ${on ? "checked" : ""}> Show</label>
       <button class="fdanger" data-fdel="${f.id}" title="Delete filter">✕</button>
-    </div>`;
-  }).join("");
+    </div>`).join("");
   $("filters").innerHTML = `<div class="jm-box">
-    <div class="jm-head"><h3>Filters / layers</h3><button id="fClose" title="Close">✕</button></div>
+    <div class="jm-head"><h3>Edit filters</h3><button id="fClose" title="Close">✕</button></div>
     <div class="jm-body">
-      <p class="jm-hint">Create named filters, then tag any object from its properties panel. Enable one or more filters to dim every object that does not match. Connections stay lit when tagged or when both endpoints match.</p>
+      <p class="jm-hint">Create named filters, then tag any object from its properties panel. Turn filter views on or off from the floating <b>Filter views</b> checklist at the top-left of the canvas. Objects without an active filter are dimmed; a matching object also keeps its containing zones/swimlanes lit.</p>
       <div class="fnew">
         <input type="text" id="fName" placeholder="New filter name…" maxlength="40">
         <div class="fcolors">${FILTER_COLORS.map(c => `<div class="sw" data-newcolor="${c}" style="background:${c}"></div>`).join("")}</div>
@@ -9791,8 +9901,8 @@ function buildFiltersModal(){
     </div>
     <div class="jm-foot">
       <div class="jm-foot-r">
-        <span class="fcount">${activeFilters.size} active · ${filters.length} total</span>
-        <button id="fClear" class="jprimary">Clear active</button>
+        <span class="fcount">${filters.length} filter${filters.length === 1 ? "" : "s"}</span>
+        <button id="fDone" class="jprimary">Done</button>
       </div>
     </div>
   </div>`;
@@ -9809,38 +9919,33 @@ function buildFiltersModal(){
   $("fAdd").onclick = add;
   $("fName").addEventListener("keydown", e => { e.stopPropagation(); if(e.key === "Enter") add(); });
   $("fClose").onclick = toggleFilters;
-  $("fClear").onclick = () => { activeFilters.clear(); updateFilterBadge(); renderAll(); buildFiltersModal(); };
+  $("fDone").onclick = toggleFilters;
   $("filters").querySelectorAll(".fname").forEach(inp => {
     inp.addEventListener("change", () => renameFilter(inp.dataset.fid, inp.value));
     inp.addEventListener("keydown", e => { e.stopPropagation(); if(e.key === "Enter") e.target.blur(); });
   });
-  $("filters").querySelectorAll(".factive").forEach(cb => cb.addEventListener("change", () => toggleFilterActive(cb.dataset.fid, cb.checked)));
   $("filters").querySelectorAll(".fdot").forEach(dot => dot.addEventListener("click", () => cycleFilterColor(dot.dataset.fcolor)));
   $("filters").querySelectorAll(".fdanger").forEach(b => b.addEventListener("click", () => deleteFilter(b.dataset.fdel)));
 }
 function addFilter(name, color){
   filters.push({id:uid("fl"), name:String(name).trim().slice(0, 40), color:color || FILTER_COLORS[0]});
-  saveSoon(); renderAll(); buildFiltersModal();
+  saveSoon(); renderFilterViews(); renderAll(); buildFiltersModal();
 }
 function renameFilter(id, name){
   const f = filterById(id); if(!f) return;
   const n = String(name || "").trim().slice(0, 40);
   if(!n || n === f.name){ buildFiltersModal(); return; }
-  f.name = n; saveSoon(); renderAll(); buildFiltersModal();
+  f.name = n; saveSoon(); renderFilterViews(); renderAll(); buildFiltersModal();
 }
 function cycleFilterColor(id){
   const f = filterById(id); if(!f) return;
   const i = Math.max(0, FILTER_COLORS.indexOf(f.color));
   f.color = FILTER_COLORS[(i + 1) % FILTER_COLORS.length];
-  saveSoon(); renderAll(); buildFiltersModal();
+  saveSoon(); renderFilterViews(); renderAll(); buildFiltersModal();
 }
 function toggleFilterActive(id, on){
   if(on) activeFilters.add(id); else activeFilters.delete(id);
-  updateFilterBadge(); renderAll();
-  const row = $("filters").querySelector(`.frow[data-fid="${id}"]`);
-  if(row) row.classList.toggle("off", !on);
-  const count = $("filters").querySelector(".fcount");
-  if(count) count.textContent = `${activeFilters.size} active · ${filters.length} total`;
+  updateFilterBadge(); renderAll(); updateFilterViewsState();
 }
 function deleteFilter(id){
   const f = filterById(id); if(!f) return;
@@ -9850,7 +9955,7 @@ function deleteFilter(id){
   const strip = o => { if(Array.isArray(o.tags)){ o.tags = o.tags.filter(t => t !== id); if(!o.tags.length) delete o.tags; } };
   const visit = st => { if(!st) return; (st.nodes || []).forEach(strip); (st.edges || []).forEach(strip); (st.zones || []).forEach(strip); };
   visit(state); pages.forEach(p => { if(p.state !== state) visit(p.state); });
-  saveSoon(); updateFilterBadge(); renderAll(); buildFiltersModal();
+  saveSoon(); updateFilterBadge(); renderFilterViews(); renderAll(); buildFiltersModal();
 }
 
 /* ---------- history / persistence ---------- */
@@ -11686,6 +11791,7 @@ function importJSON(file){
       pruneTags();
       activeFilters.clear();
       updateFilterBadge();
+      renderFilterViews();
       if(filtersOpen) buildFiltersModal();
       selection.clear();
       undoStack = []; redoStack = [];
@@ -11865,6 +11971,8 @@ function boot(){
   undoStack = []; redoStack = [];
   lastSnap = serialize();
   renderPageTabs();
+  renderFilterViews();
+  updateFilterBadge();
   renderAll();
   applyView();
   setTool("select");

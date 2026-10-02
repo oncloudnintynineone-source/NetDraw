@@ -3,8 +3,9 @@
 ## v1.1.11 - 2026-10-02
 
 - Updated the displayed NetDraw version to `v1.1.11`.
-- Added filters/layers: create document-wide named, colored filters in a new Filters panel, then tag any node, connection, zone, or swimlane from its properties panel (single or multi-selection).
-- Toggling one or more filters dims every object that does not match; connections stay visible when tagged or when both endpoints match.
+- Added filters/layers: create document-wide named, colored filters in an Edit filters dialog, then tag any node, connection, zone, or swimlane from its properties panel (single or multi-selection).
+- Added a floating **Filter views** checklist at the top-left of the canvas for enabling and disabling filters; it can be collapsed and remembers its state.
+- Toggling one or more filters dims every object that does not match, while keeping the matching object's containing zones and swimlanes (parents, grandparents, …) lit. Connections stay visible when tagged or when both endpoints match.
 - SVG/PNG/GIF exports prompt to render the full diagram or exactly what is on screen while filters are active.
 
 ## v1.1.10 - 2026-10-02
