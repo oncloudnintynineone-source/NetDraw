@@ -9249,19 +9249,33 @@ function nearestPortSide(o, p){
   }
   return best;
 }
+// outward unit normal of a face — used to leave an endpoint perpendicular to its own side
+function portNormal(side){
+  if(side === "top") return {x:0, y:-1};
+  if(side === "bottom") return {x:0, y:1};
+  if(side === "left") return {x:-1, y:0};
+  if(side === "right") return {x:1, y:0};
+  return null;
+}
 function anchor(o, toward){
-  if(!o.id) return {x:o.x, y:o.y};
+  if(!o.id) return {x:o.x, y:o.y, side:null};
   const c = endpointCenter(o), tc = endpointCenter(toward);
   const dx = tc.x - c.x, dy = tc.y - c.y;
-  if(dx === 0 && dy === 0) return c;
+  if(dx === 0 && dy === 0) return {x:c.x, y:c.y, side:null};
   const b = endpointBounds(o);
   const hw = b.w/2 + 5, hh = b.h/2 + 5;
-  const s = Math.min(hw / Math.abs(dx || 1e-9), hh / Math.abs(dy || 1e-9));
-  return {x: c.x + dx * s, y: c.y + dy * s};
+  const sx = hw / Math.abs(dx || 1e-9), sy = hh / Math.abs(dy || 1e-9);
+  const s = Math.min(sx, sy);
+  // whichever face the ray reaches first is the face the edge leaves through
+  return {x: c.x + dx * s, y: c.y + dy * s,
+          side: sx <= sy ? (dx < 0 ? "left" : "right") : (dy < 0 ? "top" : "bottom")};
 }
+const EDGE_CURVE_K = 0.4;
 function edgeGeom(a, b, route = "curved", edge = null){
-  const p1 = (edge && edge.fromPort && portPoint(a, edge.fromPort)) || anchor(a, b);
-  const p2 = (edge && edge.toPort && portPoint(b, edge.toPort)) || anchor(b, a);
+  const gp1 = anchor(a, b), gp2 = anchor(b, a);
+  const fromPort = edge ? cleanPort(edge.fromPort) : "", toPort = edge ? cleanPort(edge.toPort) : "";
+  const p1 = (fromPort && portPoint(a, fromPort)) || gp1;
+  const p2 = (toPort && portPoint(b, toPort)) || gp2;
   const dx = p2.x - p1.x, dy = p2.y - p1.y;
   if(route === "straight"){
     return {
@@ -9287,9 +9301,19 @@ function edgeGeom(a, b, route = "curved", edge = null){
       p1, c1:p1, c2:p2, p2, bend, handles
     };
   }
-  let c1, c2;
-  if(Math.abs(dx) >= Math.abs(dy)){ c1 = {x:p1.x + dx*.4, y:p1.y}; c2 = {x:p2.x - dx*.4, y:p2.y}; }
-  else { c1 = {x:p1.x, y:p1.y + dy*.4}; c2 = {x:p2.x, y:p2.y - dy*.4}; }
+  // each end leaves along its own outward face normal, so the curve stays perpendicular to both
+  // endpoints even when the two ends pick different faces; fallback = dominant chord axis
+  const gn = Math.abs(dx) >= Math.abs(dy)
+    ? {x:Math.sign(dx) || 1, y:0} : {x:0, y:Math.sign(dy) || 1};
+  const n1 = portNormal(fromPort || gp1.side) || gn;
+  const n2 = portNormal(toPort || gp2.side) || gn;
+  // bow runs along the normal's axis, using the chord's extent on that axis; when that extent is
+  // zero (both ends level on horizontal ports, say) fall back to the other axis, otherwise c1/c2
+  // collapse onto p1/p2 and the tangent silently flips to the wrong direction
+  const span = Math.abs(dx) || Math.abs(dy);
+  const bow = n => (Math.abs(n.x) ? (Math.abs(dx) || span) : (Math.abs(dy) || span)) * EDGE_CURVE_K;
+  const c1 = {x: p1.x + n1.x * bow(n1), y: p1.y + n1.y * bow(n1)};
+  const c2 = {x: p2.x + n2.x * bow(n2), y: p2.y + n2.y * bow(n2)};
   return {
     d:`M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`,
     mid:{x:(p1.x + 3*c1.x + 3*c2.x + p2.x)/8, y:(p1.y + 3*c1.y + 3*c2.y + p2.y)/8},
