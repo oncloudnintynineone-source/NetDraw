@@ -1,6 +1,6 @@
 # NetDraw
 
-Current version: `v1.1.11`
+Current version: `v1.1.12`
 
 NetDraw is a self-contained browser-based network diagram editor. The app lives in `NetDraw.html` and runs locally without a build step or server.
 
@@ -24,6 +24,7 @@ If `xdg-open` is not available, open the file from your browser with `File -> Op
 - Create zones and swimlanes for network segments and process lanes.
 - Create multiple pages from bottom tabs; each page keeps its own canvas and view.
 - Build page-level journey walkthroughs with ordered reveal/highlight steps and captions.
+- Search the current page by object label, device name, IP address, or DNS name from the topbar search box, then jump straight to a match.
 - Resize objects and zones from selection handles.
 - Copy and paste selected objects or groups with their internal connections using NetDraw's in-page clipboard.
 - Edit labels, metadata, disposition, effects, colors, lane names, and edge styles from the properties panel, including multiple selected objects at once with mixed-value indicators.

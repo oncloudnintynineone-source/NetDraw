@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.1.12 - 2026-10-02
+
+- Updated the displayed NetDraw version to `v1.1.12`.
+- Added object search: open the **Search objects** box in the topbar to search the current page by object label, device name, IP address, or DNS name. Results list each object with the matching field, and selecting one selects it and centers the canvas on it.
+
 ## v1.1.11 - 2026-10-02
 
 - Updated the displayed NetDraw version to `v1.1.11`.
