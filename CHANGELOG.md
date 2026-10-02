@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.1.13 - 2026-10-02
+
+- Updated the displayed NetDraw version to `v1.1.13`.
+- Added a **Marquee** box-select tool (`B`): drag a box anywhere on the canvas to select the nodes and zones it touches. Plain drag replaces the selection, `Shift`+drag adds to it, and `Ctrl`/`Cmd`+drag toggles individual objects. The tool stays active for consecutive boxes, and middle/right/`Space`+drag still pans.
+
 ## v1.1.12 - 2026-10-02
 
 - Updated the displayed NetDraw version to `v1.1.12`.

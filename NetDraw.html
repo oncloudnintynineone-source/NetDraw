@@ -128,6 +128,8 @@
 
   g.nodeg{cursor:move;}
   #canvas.tool-connect g.nodeg{cursor:crosshair;}
+  #canvas.tool-marquee{cursor:crosshair;}
+  #canvas.tool-marquee g.nodeg, #canvas.tool-marquee g.zoneg{cursor:crosshair;}
   .ports{opacity:0; transition:opacity .13s;}
   g.nodeg:hover .ports{opacity:1;}
   .port{cursor:crosshair;}
@@ -423,12 +425,15 @@
         <circle cx="5" cy="6" r="2.6"/><circle cx="19" cy="6" r="2.6"/><circle cx="12" cy="18" r="2.6"/>
         <path d="M7 7.5 10.5 16M17 7.5 13.5 16M7.6 6h8.8"/>
       </svg>
-      NetDraw <span class="sub">v1.1.12</span>
+      NetDraw <span class="sub">v1.1.13</span>
     </div>
 
     <div class="tgroup">
       <button id="toolSelect" title="Select / Move  (V)">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M5 3l14 8.5-6.2 1.4L9.5 19z"/></svg>
+      </button>
+      <button id="toolMarquee" title="Marquee / box select  (B)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-dasharray="3.6 2.4"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/></svg>
       </button>
       <button id="toolConnect" title="Connect  (C)">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="5.5" cy="18.5" r="2.8"/><circle cx="18.5" cy="5.5" r="2.8"/><path d="M7.6 16.4 16.4 7.6"/></svg>
@@ -571,7 +576,7 @@
         <button id="pickUse">Use selection</button>
         <button id="pickCancel">Cancel</button>
       </div>
-      <div id="hintbar"><b>V</b> select&ensp;·&ensp;<b>C</b> connect&ensp;·&ensp;<b>Z</b> zone&ensp;·&ensp;drag empty canvas to pan&ensp;·&ensp;<b>Shift</b>+drag select&ensp;·&ensp;<b>Del</b> delete</div>
+      <div id="hintbar"><b>V</b> select&ensp;·&ensp;<b>B</b> box select&ensp;·&ensp;<b>C</b> connect&ensp;·&ensp;<b>Z</b> zone&ensp;·&ensp;drag empty canvas to pan&ensp;·&ensp;<b>Shift</b>+drag select&ensp;·&ensp;<b>Del</b> delete</div>
       <textarea id="labelEditor" rows="1" spellcheck="false"></textarea>
       <div id="toast"></div>
       <div id="recModal">
@@ -10489,6 +10494,7 @@ function setTool(t){
   clearTemp();
   svg.className.baseVal = "tool-" + t;
   $("toolSelect").classList.toggle("active", t === "select");
+  $("toolMarquee").classList.toggle("active", t === "marquee");
   $("toolConnect").classList.toggle("active", t === "connect");
   $("toolZone").classList.toggle("active", t === "zone");
   $("toolLane").classList.toggle("active", t === "lane");
@@ -10496,7 +10502,7 @@ function setTool(t){
 }
 
 /* ---------- temp edge / marquee ---------- */
-function clearTemp(){ tempLayer.innerHTML = ""; uiLayer.innerHTML = ""; markLinkTarget(null); }
+function clearTemp(){ tempLayer.innerHTML = ""; uiLayer.innerHTML = ""; markLinkTarget(null); clearMarqueeMarks(); }
 function drawTempEdge(fromNode, wp, fromPort = ""){
   tempLayer.innerHTML = "";
   const fake = {x:wp.x, y:wp.y};
@@ -10522,6 +10528,44 @@ function markLinkTarget(id){
     const isTarget = g.getAttribute("data-zone") === id;
     if(isTarget){ frame.setAttribute("stroke", "#7dd3fc"); frame.setAttribute("stroke-width", 2.4); }
   }
+}
+
+/* live marquee feedback: re-stroke hit objects without a full renderAll */
+let marqueeMarks = [];
+function clearMarqueeMarks(){
+  for(const m of marqueeMarks){ m.el.setAttribute("stroke", m.stroke); m.el.setAttribute("stroke-width", m.sw); }
+  marqueeMarks = [];
+}
+function markMarqueeHits(ids){
+  clearMarqueeMarks();
+  const set = new Set(ids);
+  for(const g of nodesLayer.querySelectorAll("g.nodeg")){
+    if(!set.has(g.getAttribute("data-node"))) continue;
+    const card = g.querySelector(".card");
+    if(!card) continue;
+    marqueeMarks.push({el:card, stroke:card.getAttribute("stroke"), sw:card.getAttribute("stroke-width")});
+    card.setAttribute("stroke", "#38bdf8"); card.setAttribute("stroke-width", 2);
+  }
+  for(const g of zonesLayer.querySelectorAll("g.zoneg")){
+    if(!set.has(g.getAttribute("data-zone"))) continue;
+    const frame = g.querySelector("rect");
+    if(!frame) continue;
+    marqueeMarks.push({el:frame, stroke:frame.getAttribute("stroke"), sw:frame.getAttribute("stroke-width")});
+    frame.setAttribute("stroke", "#38bdf8"); frame.setAttribute("stroke-width", 2.4);
+  }
+}
+function nodeHitsIn(x0, y0, x1, y1){
+  return state.nodes.filter(n => {
+    const hw = nodeW(n)/2, hh = nodeH(n)/2;
+    return n.x + hw > x0 && n.x - hw < x1 && n.y + hh > y0 && n.y - hh < y1;
+  }).map(n => n.id);
+}
+function zoneHitsIn(x0, y0, x1, y1){
+  return state.zones.filter(z => z.x + z.w > x0 && z.x < x1 && z.y + z.h > y0 && z.y < y1).map(z => z.id);
+}
+function marqueeHits(x0, y0, x1, y1){
+  const ids = [...zoneHitsIn(x0, y0, x1, y1), ...nodeHitsIn(x0, y0, x1, y1)];
+  return ids.filter(id => elemState(id) === "on");
 }
 function endpointUnderPointer(e){
   const t = document.elementFromPoint(e.clientX, e.clientY);
@@ -10574,11 +10618,20 @@ svg.addEventListener("pointerdown", e => {
       if(e.shiftKey) selection.has(id) ? selection.delete(id) : selection.add(id);
       else selection = new Set([id]);
     } else {
-      drag = {kind:"marquee", x0:wp.x, y0:wp.y, x1:wp.x, y1:wp.y, add:e.shiftKey};
+      drag = {kind:"marquee", x0:wp.x, y0:wp.y, x1:wp.x, y1:wp.y,
+        mode: e.shiftKey ? "add" : "replace", base: new Set(selection), zones:true};
       svg.setPointerCapture(e.pointerId);
-      if(!e.shiftKey) selection.clear();
     }
     renderAll();
+    return;
+  }
+
+  // marquee tool: drag anywhere (including over objects) to rubber-band select
+  if(tool === "marquee"){
+    drag = {kind:"marquee", x0:wp.x, y0:wp.y, x1:wp.x, y1:wp.y,
+      mode: e.shiftKey ? "add" : (e.ctrlKey || e.metaKey) ? "toggle" : "replace",
+      base: new Set(selection), zones:true};
+    svg.setPointerCapture(e.pointerId);
     return;
   }
 
@@ -10726,7 +10779,7 @@ svg.addEventListener("pointerdown", e => {
   // Empty canvas: drag to pan by default; Shift+drag keeps marquee selection available.
   if(tool === "select"){
     drag = e.shiftKey
-      ? {kind:"marquee", x0:wp.x, y0:wp.y, x1:wp.x, y1:wp.y, add:true}
+      ? {kind:"marquee", x0:wp.x, y0:wp.y, x1:wp.x, y1:wp.y, mode:"add", base:new Set(selection)}
       : {kind:"pan", sx:e.clientX, sy:e.clientY, vx:view.x, vy:view.y};
     if(!e.shiftKey) svg.classList.add("panning");
     svg.setPointerCapture(e.pointerId);
@@ -10819,6 +10872,12 @@ window.addEventListener("pointermove", e => {
     const w = Math.abs(drag.x1 - drag.x0), h = Math.abs(drag.y1 - drag.y0);
     uiLayer.appendChild(el("rect", {x, y, width:w, height:h, rx:4, fill:"#38bdf8", "fill-opacity":.07,
       stroke:"#38bdf8", "stroke-opacity":.5, "stroke-width":1, "vector-effect":"non-scaling-stroke"}));
+    if(drag.hx === undefined || Math.abs(drag.x1 - drag.hx) > 2 || Math.abs(drag.y1 - drag.hy) > 2){
+      drag.hx = drag.x1; drag.hy = drag.y1;
+      const hx0 = Math.min(drag.x0, drag.x1), hx1 = Math.max(drag.x0, drag.x1);
+      const hy0 = Math.min(drag.y0, drag.y1), hy1 = Math.max(drag.y0, drag.y1);
+      markMarqueeHits(drag.zones || picking ? marqueeHits(hx0, hy0, hx1, hy1) : nodeHitsIn(hx0, hy0, hx1, hy1));
+    }
   }
 });
 
@@ -10868,18 +10927,17 @@ window.addEventListener("pointerup", e => {
   }
   else if(d.kind === "marquee"){
     uiLayer.innerHTML = "";
+    clearMarqueeMarks();
     const x0 = Math.min(d.x0, d.x1), x1 = Math.max(d.x0, d.x1);
     const y0 = Math.min(d.y0, d.y1), y1 = Math.max(d.y0, d.y1);
     if(x1 - x0 > 4 || y1 - y0 > 4){
-      const nodeHits = state.nodes.filter(n => {
-        const hw = nodeW(n)/2, hh = nodeH(n)/2;
-        return n.x + hw > x0 && n.x - hw < x1 && n.y + hh > y0 && n.y - hh < y1;
-      }).map(n => n.id);
-      const zoneHits = state.zones.filter(z =>
-        z.x + z.w > x0 && z.x < x1 && z.y + z.h > y0 && z.y < y1).map(z => z.id);
-      const hits = picking ? [...zoneHits, ...nodeHits] : nodeHits;
-      if(!d.add) selection.clear();
-      hits.forEach(id => selection.add(id));
+      const hits = d.zones || picking ? marqueeHits(x0, y0, x1, y1) : nodeHitsIn(x0, y0, x1, y1);
+      const next = new Set(d.mode === "replace" ? [] : d.base);
+      for(const id of hits){
+        if(d.mode === "toggle"){ next.has(id) ? next.delete(id) : next.add(id); }
+        else next.add(id);
+      }
+      selection = next;
       renderAll();
     }
   }
@@ -11521,6 +11579,7 @@ window.addEventListener("keydown", e => {
   else if(e.key.toLowerCase() === "c" && !mod) setTool("connect");
   else if(e.key.toLowerCase() === "z" && !mod) setTool("zone");
   else if(e.key.toLowerCase() === "l") setTool("lane");
+  else if(e.key.toLowerCase() === "b" && !mod) setTool("marquee");
   else if(e.key.toLowerCase() === "h") setTool("pan");
   else if(e.key.toLowerCase() === "f") zoomFit();
   else if(e.key === "+" || e.key === "=") zoomBy(1.2);
@@ -12084,6 +12143,7 @@ $("fxCancel").onclick = () => { pendingExport = null; $("filterExportModal").cla
 
 /* ---------- toolbar wiring ---------- */
 $("toolSelect").onclick = () => setTool("select");
+$("toolMarquee").onclick = () => setTool("marquee");
 $("toolConnect").onclick = () => setTool("connect");
 $("toolZone").onclick = () => setTool("zone");
 $("toolLane").onclick = () => setTool("lane");
